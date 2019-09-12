@@ -4,9 +4,10 @@ This contains an algorithm to automatically estimate continua or broad underlyin
 
 See references:
 
-[1] Schulz et al (2011) "A Model-Free, Fully Automated Baseline-Removal Method for 
+> [1] Schulz et al (2011) "A Model-Free, Fully Automated Baseline-Removal Method for 
 Raman Spectra"
-[2] Schulz et al. (2012) "A Small-Window Moving Average-Based Fully Automated Baseline 
+
+> [2] Schulz et al. (2012) "A Small-Window Moving Average-Based Fully Automated Baseline 
 Estimation Method for Raman Spectra"
 
 # Usage
