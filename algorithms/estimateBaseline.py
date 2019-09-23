@@ -111,17 +111,19 @@ def estimateBaseline(X, Y, window, notch = False, fill_between = None):
     window size is reduced in the if loop and made an odd number with the second if loop.
     """
 
-    assert window % 2 == 1, \
-         "Window span must be an odd integer"
+    if not window % 2 == 1:
+         raise ValueError("Window span must be an odd integer")
 
     if notch:
                        
-        assert len(fill_between) == 2, \
-            "'fill_between' wavelengths not correctly (e.g. fill_between = [lower, upper])"           
-        assert np.min(X) < fill_between[0] < np.max(X), \
-            "'fill_between' lower bound out of range"
-        assert np.min(X) < fill_between[1] < np.max(X), \
-            "'fill_between' upper bound out of range"
+        if len(fill_between) != 2:
+            raise ValueError("'fill_between' wavelengths not correctly (e.g. fill_between = [lower, upper])")           
+
+        if not np.min(X) < fill_between[0] < np.max(X):
+            raise ValueError("'fill_between' lower bound out of range")
+        
+        if not np.min(X) < fill_between[1] < np.max(X):
+            raise ValueError("'fill_between' upper bound out of range")
 
         Y = fillNotch(X, Y, fill_between)
 
