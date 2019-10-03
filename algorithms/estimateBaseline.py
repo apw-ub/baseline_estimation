@@ -22,11 +22,12 @@ def Noise(Y):
     three-times noise value are replaced and then the final value is calculated.
     """
 
-    a1 = Y + [0] + [0]
-    a2 = [0] + Y + [0]
-    a3 = [0] + [0] + Y
 
-    G = [((a3 - a2) - (a2 - a1)) for a1, a2, a3 in zip(a1,a2,a3)]
+    a1 = np.pad(Y, (0, 2), 'constant', constant_values=(0, 0))
+    a2 = np.pad(Y, (1, 1), 'constant', constant_values=(0, 0))
+    a3 = np.pad(Y, (2, 0), 'constant', constant_values=(0, 0))
+
+    G = ((a3 - a2) - (a2 - a1))
 
     noise = np.std(G[2:])
      
@@ -36,33 +37,7 @@ def Noise(Y):
 
     return noise 
 
-
-def addPadding(bl_in_progress, window, Y_avg_left, Y_avg_right): 
-
-    """
-    Die Funktion haengt and die Enden der Spektren Anhaengsel, die die Groesse
-    der Fenstergroesse haben. Der Wert dieser Anhaengsel muss beim Aufrufen der
-    Funktion mit eingegeben werden.
-    """
-
-    padding_added = [Y_avg_left] * window + bl_in_progress + [Y_avg_right] * window
-
-    return padding_added 
-
-
-def removePadding(bl_padded, window): ## OK
-
-    """
-    Die Funktion entfernt die durch die Funktion `addPadding` zuvor angefuegten
-    Anhaengsel wieder.
-    """
-
-    padding_removed = [i for i in bl_padded[window:-window]]
-
-    return padding_removed
-
-
-def fillNotch(X, Y, fill_between): # OK
+def fillNotch(X, Y, fill_between):
 
     """
     Fills notch created by interference or absorption filter for better baseline 
@@ -128,42 +103,63 @@ def estimateBaseline(X, Y, window, notch = False, fill_between = None):
         Y = fillNotch(X, Y, fill_between)
 
     array_len = len(X)
-    empty_array = [0] * array_len   
+    empty_array = np.zeros(array_len)   
     length_to_window = math.floor(array_len/window)
     
     noise = Noise(Y)
 
     baseline = signal.savgol_filter(Y, window, 0)
 
-    # Remove peaks, i.e if within noise range of baseline ignore.
-    bl_in_progress = [bl + 1.99 * noise * np.random.randn() if Y[idx] > bl * 2 * noise else bl for idx, bl in enumerate(baseline)]
-    
-    residuals = np.subtract(bl_in_progress, baseline)
+    bl_in_progress = np.array(baseline)
 
-    chi = np.sum(np.divide(np.power(np.subtract(empty_array, residuals), 2), noise ** 2))
+    for i in range(array_len):
+
+        if Y[i] > bl_in_progress[i] * 2 * noise:
+
+            bl_in_progress[i] = bl_in_progress[i] + 1.99 * noise * np.random.randn()
+
+        else:
+
+            pass
+
+
+    residuals = bl_in_progress - baseline
+
+    chi = np.sum(((empty_array - residuals) ** 2) / (noise ** 2))
 
     j = 0
 
-    smooth_orig_signal = [0] * array_len
+    smooth_orig_signal = np.zeros(array_len)
 
     while chi >= array_len:
 
         orig_signal = list(Y)
 
-        for idx in range(array_len):
-            if bl_in_progress[idx] > baseline[idx] + 2 * noise:
-                bl_in_progress[idx] = baseline[idx] + 1.99 * noise * np.random.randn()
+        #bl_in_progress[bl_in_progress > (baseline + 2 * noise)] = baseline + 1.99 * noise * np.random.randn()
+
+        for i in range(array_len):
+
+            if bl_in_progress[i] > baseline[i] + 2 * noise:
+
+                bl_in_progress[i] = baseline[i] + 1.99 * noise * np.random.randn()
+
             else:
+
                 pass
+
 
         Y_avg_left = np.mean(Y[0:window])
         Y_avg_right = np.mean(Y[window:-1])
+        
+        # Start pad-smooth-unpad
 
-        bl_padded = addPadding(bl_in_progress, window, Y_avg_left, Y_avg_right)
+        bl_padded = np.pad(bl_in_progress, (window, window), 'constant', constant_values=(Y_avg_left, Y_avg_right))
 
         bl_smoothed = signal.savgol_filter(bl_padded, window, 0)
 
-        baseline = removePadding(bl_smoothed, window)
+        baseline = bl_smoothed[window:-window]
+
+        # End pad-smooth-unpad
 
         for idx in range(array_len):
             if orig_signal[idx] > baseline[idx] + 2 * noise:
@@ -171,10 +167,10 @@ def estimateBaseline(X, Y, window, notch = False, fill_between = None):
             else:
                 smooth_orig_signal[idx] = orig_signal[idx]
 
-        residuals = np.subtract(smooth_orig_signal, baseline)
-        test = np.subtract(Y, baseline)
-        chi = np.sum(np.divide(np.power(np.subtract(empty_array, residuals), 2), noise ** 2))
-        chi2 = np.sum(np.divide(np.power(np.subtract(Y, np.add(test, np.mean(baseline))), 2), noise ** 2))
+        residuals = smooth_orig_signal - baseline
+        test = Y - baseline
+        chi = np.sum(((empty_array - residuals) ** 2) / noise ** 2)
+        chi2 = np.sum(((Y - (test + np.mean(baseline))) ** 2) / noise ** 2)
 
         j += 1
 
